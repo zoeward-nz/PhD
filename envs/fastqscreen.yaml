@@ -1,0 +1,7 @@
+name: fastqscreen
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - fastq-screen=0.11.3=pl526_1

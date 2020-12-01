@@ -1,0 +1,10 @@
+name: bmtools
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - bmfilter=3.101=hfc679d8_2
+  - bmtool=3.101=hfc679d8_2
+  - bmtagger=3.101=h470a237_4
+

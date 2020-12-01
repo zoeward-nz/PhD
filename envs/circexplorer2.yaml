@@ -1,0 +1,8 @@
+name: circexplorer2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - circexplorer2=2.3.2=py36_0
+

@@ -1,0 +1,13 @@
+module_order:
+  - star:
+      name: 'STAR (1st pass)'
+      info: 'This section of the report shows STAR first pass mapping results.'
+      path_filters:
+        - '*mapped_1stpass/*Log.final.out'
+  - star:
+      name: 'STAR (2nd pass)'
+      info: 'This section of the report shows STAR second pass mapping results.'
+      path_filters:
+        - '*mapped_2ndpass/*Log.final.out'
+  - rseqc
+  - salmon

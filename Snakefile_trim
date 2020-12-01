@@ -1,0 +1,112 @@
+import glob, os, os.path, datetime, sys, csv
+from os.path import join
+
+## Workflow starts with trimmed data! Trimming is done separately!!! 
+## ============================================================================= 
+## LOAD VARIABLES FROM CONFIGFILE
+## config-file needs to be submitted on command-line via --configfile
+
+## General
+LOGDIR = os.path.abspath(config["logs"])
+BENCHMARKDIR = os.path.abspath(config["benchmarks"])
+ENVDIR = os.path.abspath(config["envdir"])
+SCRIPTS = os.path.abspath(config["scriptdir"])
+DATA = os.path.abspath(config["datadir"])
+RES = os.path.abspath(config["results"])
+FASTQC = os.path.abspath(config["fastqc"])
+
+#THREADS = config["threads"]
+
+
+## sample inputs
+SAMPLEDIR = os.path.abspath(config["samples"]["dir"])
+#UNTRIMMEDSAMPLE = os.path.abspath(config["samples"]["dir2"])
+SAMPLESHEET = os.path.abspath(config["samples"]["samplesheet"])
+UNTRIM1 = config["samples"]["untrim1"]
+UNTRIM2 = config["samples"]["untrim2"]
+R1 = config["samples"]["r1"]
+R2 = config["samples"]["r2"]
+
+
+## outputs
+#TRIMMED = join(RES, config["outputs"]["trimmed"])
+
+
+###-------------------------------------------------------------------------------
+
+#SAMPLES, = glob_wildcards(join(FASTQ,'{sample}_fwd_paired.fastq'))
+## reading samplename from samplesheet
+print("Reading samples from samplesheet...")
+SAMPLES = []
+reader = csv.reader(open(SAMPLESHEET), delimiter="\t")
+for a in reader:
+#	print(len(a))
+	SAMPLES.append(a[0])
+#print(SAMPLES)
+# test if sample in dir
+for fname in expand(join(SAMPLEDIR, UNTRIM1), sample=SAMPLES):
+	if not os.path.isfile(fname):
+		print("File '{}' from samplesheet can not be found. Make sure the file exists. Exit\n".format(fname))
+		sys.exit()
+
+NUM_SAMPLES = len(SAMPLES)
+print('{} samples to process'.format(NUM_SAMPLES))
+
+rule all:
+	input:
+#		expand(join(SAMPLEDIR, "{sample}_fwd_paired.fastq"),sample=SAMPLES),
+#                expand(join(SAMPLEDIR, "{sample}_rev_paired.fastq"), sample=SAMPLES)
+#		expand(join(FASTQC, "{sample}.fastqc.done"), sample=SAMPLES)
+		join(FASTQC, "multiqc.done")
+
+### adapetrs.fa downloaded from bbmap suite https://github.com/BioInfoTools/BBMap/blob/master/resources/adapters.fa
+rule trimmomatic:
+	input:
+		r1=join(SAMPLEDIR, UNTRIM1),
+		r2=join(SAMPLEDIR, UNTRIM2)
+	output:
+		out1=join(SAMPLEDIR, "{sample}_fwd_paired.fastq.gz"),
+		out2=join(SAMPLEDIR, "{sample}_rev_paired.fastq.gz"),
+		out3=temp(join(SAMPLEDIR, "{sample}_fwd_upaired.fastq.gz")),
+		out4=temp(join(SAMPLEDIR, "{sample}_rev_unpaired.fastq"))
+	log:
+		join(LOGDIR, "{sample}.trim.log.txt")
+	params:
+		adapt=join(DATA, 'adapters.fa')		
+	conda:
+		join(ENVDIR, "trim.yaml")
+	shell:
+		"""
+		trimmomatic PE -threads 16 {input.r1} {input.r2} {output.out1} {output.out3} {output.out2} {output.out4} ILLUMINACLIP:{params.adapt}:2:30:10 HEADCROP:3 SLIDINGWINDOW:4:20 LEADING:3 TRAILING:3 MINLEN:36 2> {log}
+		"""
+rule fastqc:
+	input:
+		untrim1=join(SAMPLEDIR, UNTRIM1),
+		untrim2=join(SAMPLEDIR, UNTRIM2),
+		trim1=join(SAMPLEDIR, "{sample}_fwd_paired.fastq.gz"),
+		trim2=join(SAMPLEDIR, "{sample}_rev_paired.fastq.gz")
+	output:
+		touch(join(FASTQC, "{sample}.fastqc.done"))
+	log:
+		err=join(LOGDIR, "{sample}.fastqc.sterr.txt"),
+		out=join(LOGDIR, "{sample}.fastqc.txt")
+	conda:
+		join(ENVDIR, "fastqc.yaml")
+	shell:
+		"""
+		fastqc {input.untrim1} {input.untrim2} {input.trim1} {input.trim2} --outdir {FASTQC} > {log.out} 2> {log.err}
+		"""
+
+rule multiqc:
+	input:
+		expand(join(FASTQC, "{sample}.fastqc.done"), sample=SAMPLES)
+	output:
+		touch(join(FASTQC, "multiqc.done"))
+#	log:
+#		out=join(LOGDIR, "multiqc.txt")
+	conda:
+		join(ENVDIR, "multiqc.yaml")
+	shell:
+		"""
+		multiqc {FASTQC} -o {FASTQC}
+		"""

@@ -1,0 +1,8 @@
+name: bracken
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - bracken=2.2=py27h2d50403_1
+

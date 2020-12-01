@@ -1,0 +1,8 @@
+name: star2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - star=2.7.1a=0
+

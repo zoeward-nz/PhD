@@ -1,0 +1,11 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults 
+dependencies:
+  - bioconductor-edger=3.20.7
+  - bioconductor-deseq2=1.18.1
+  - r-readr=1.1.1
+  - bioconductor-tximport=1.6.0
+  - numpy=1.14.5
+  - pandas=0.23.3

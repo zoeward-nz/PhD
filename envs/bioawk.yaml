@@ -1,0 +1,7 @@
+name: bioawk
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - bioawk=1.0=2

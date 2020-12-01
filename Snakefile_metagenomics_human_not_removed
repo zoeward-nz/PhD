@@ -1,0 +1,137 @@
+import glob, os, os.path, datetime, sys, csv
+from os.path import join
+
+## Workflow starts with trimmed data! Trimming is done separately!!! 
+## ============================================================================= 
+## LOAD VARIABLES FROM CONFIGFILE
+## config-file needs to be submitted on command-line via --configfile
+
+## General
+LOGDIR = os.path.abspath(config["logs"])
+BENCHMARKDIR = os.path.abspath(config["benchmarks"])
+ENVDIR = os.path.abspath(config["envdir"])
+SCRIPTS = os.path.abspath(config["scriptdir"])
+DATA = os.path.abspath(config["datadir"])
+RES = os.path.abspath(config["results"])
+BMTOOL = os.path.abspath(config["bmtool"])
+KRAKENDB = os.path.abspath(config["krakendb"])
+BRACKENDB = os.path.abspath(config["brackendb"])
+
+## sample inputs
+SAMPLEDIR = os.path.abspath(config["samples"]["dir"])
+SAMPLESHEET = os.path.abspath(config["samples"]["samplesheet"])
+UNTRIM1 = config["samples"]["untrim1"]
+UNTRIM2 = config["samples"]["untrim2"]
+R1 = config["samples"]["r1"]
+R2 = config["samples"]["r2"]
+
+
+## outputs
+METAGEN=join(RES, config["outputs"]["metagenomics"])
+MAPPING=join(RES, config["outputs"]["mapping"])
+MAPPED2=join(MAPPING, "mapped_2ndpass")
+
+###-------------------------------------------------------------------------------
+
+#SAMPLES, = glob_wildcards(join(FASTQ,'{sample}_fwd_paired.fastq'))
+## reading samplename from samplesheet
+print("Reading samples from samplesheet...")
+SAMPLES = []
+reader = csv.reader(open(SAMPLESHEET), delimiter="\t")
+for a in reader:
+	SAMPLES.append(a[0])
+print(SAMPLES)
+# test if sample in dir
+for fname in expand(join(SAMPLEDIR, R1), sample=SAMPLES):
+	if not os.path.isfile(fname):
+		print("File '{}' from samplesheet can not be found. Make sure the file exists. Exit\n".format(fname))
+		sys.exit()
+
+NUM_SAMPLES = len(SAMPLES)
+print('{} samples to process'.format(NUM_SAMPLES))
+bitmask = join(BMTOOL, 'GRCH38.bitmask')
+print(bitmask)
+
+rule all:
+	input:
+		expand(join(METAGEN, '{sample}.mate1.fixed.fq'), sample=SAMPLES),
+		expand(join(METAGEN, '{sample}.mate2.fixed.fq'), sample=SAMPLES),
+		expand(join(METAGEN, '{sample}.kraken2.out'), sample=SAMPLES),
+		expand(join(METAGEN, '{sample}.krona.html'), sample=SAMPLES),
+		expand(join(METAGEN, '{sample}.bracken.txt'), sample=SAMPLES)
+
+rule repair_fastq:
+	input:
+		um1=join(MAPPED2, '{sample}Unmapped.out.mate1'),
+		um2=join(MAPPED2, '{sample}Unmapped.out.mate2')
+	output:
+		fq1=temp(join(METAGEN, '{sample}.mate1.fixed.fq')),
+		fq2=temp(join(METAGEN, '{sample}.mate2.fixed.fq')),
+		fq3=temp(join(METAGEN, '{sample}.singletons.fq'))
+				
+	log:
+		join(LOGDIR, "repair/{sample}.bbmap.err.log")
+	conda:
+		join(ENVDIR, "bbmap.yaml")
+	shell:
+		"cat {input.um1} {input.um2} | repair.sh in=stdin out1={output.fq1} out2={output.fq2} outs={output.fq3} -Xmx100g"
+
+rule kraken:
+	input:
+		fq1=join(METAGEN, '{sample}.mate1.fixed.fq'),
+                fq2=join(METAGEN, '{sample}.mate2.fixed.fq')
+	output:
+		temp(join(METAGEN, '{sample}.kraken2.out'))
+	log:
+		join(LOGDIR, "{sample}_kraken2.out.log")
+	params:
+		rep=join(METAGEN, '{sample}.kraken2.report')
+	conda:
+		join(ENVDIR, "kraken.yaml")
+	shell:
+		"""
+		kraken2 --threads 10 --db {KRAKENDB} --fastq-input --report {params.rep} --paired {input.fq1} {input.fq2} > {output} 2> {log}  
+		"""
+
+rule for_krona:
+	input:
+		join(METAGEN, '{sample}.kraken2.out')
+	output:
+		temp(join(METAGEN, '{sample}.kraken.krona'))
+	log:
+		join(LOGDIR, "{sample}_kraken.krona.log")
+	conda:
+		join(ENVDIR, "kraken.yaml")
+	shell:
+		"""
+		cat {input} | cut -f2,3 > {output} 2> {log}
+		"""
+
+rule krona:
+	input:
+		join(METAGEN, '{sample}.kraken.krona')
+	output:
+		join(METAGEN, '{sample}.krona.html')
+	log:
+		join(LOGDIR, "{sample}.krona.html.log")
+	conda:
+		join(ENVDIR, "kraken.yaml")
+	shell:
+		"""
+		ktImportTaxonomy {input} -o {output} 2> {log}
+		"""
+rule bracken:
+	input:
+		join(METAGEN, '{sample}.kraken2.out')
+	output:
+		join(METAGEN, '{sample}.bracken.txt')
+	log:
+		join(LOGDIR, "{sample}.bracken.log")
+	params:
+		rep=join(METAGEN, '{sample}.kraken2.report')
+	conda:
+		join(ENVDIR, "bracken.yaml")
+	shell:
+		"""
+		bracken -d {BRACKENDB} -i {params.rep} -o {output} -l S 2> {log}
+		"""

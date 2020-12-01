@@ -1,0 +1,7 @@
+name: gtftogenepred
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - ucsc-gtftogenepred=357=1

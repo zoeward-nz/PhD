@@ -1,0 +1,87 @@
+fastq: "fastq"
+results: "analyses/results"
+logs: "analyses/logs"
+benchmarks: "analyses/benchmarks"
+envdir: "/media/chi/zoe/snakemake/snakemake/envs"
+scriptdir: "scripts"
+datadir: "data"
+threads: 16 # general threads per job
+## inputs
+samples:
+  dir: "fastq"
+  dir2: "/media/chi/zoe/Hiseq_pilot2/fastq/untrimmed"
+# tab-separated columns: samplename [group] [OTHERCOLUMS (not parsed)...] only samples defined in this sheet will be considered. 
+  samplesheet: "data/sample.txt"
+  untrim1: "{sample}_R1.fastq.gz"
+  untrim2: "{sample}_R2.fastq.gz"
+  r1: "{sample}_fwd_paired.fastq"
+  r2: "{sample}_rev_paired.fastq"
+## genome
+genome:
+  dir: "/media/chi/zoe/STAR_GRCh38"
+  #  genomeftp: "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/GRCh38.primary_assembly.genome.fa.gz"
+  genome: "GRCh38.r90.fa"
+  #  gtfftp: "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/gencode.v28.primary_assembly.annotation.gtf.gz"
+  gtf: "gencode.v27.gtf"
+  bed:  "hg38_GENCODE_v24_basic.bed"
+######################################################################
+## tools
+star:
+  # indexing
+  sjdbOverhang: 99 # avg mate read length -1
+  threads_idx: 10
+  # mapping if library is unstranded outSAMstrandField: "intronMotif", if stranded outSAMstrandField: "None"
+  outFilterType: "BySJout"
+  outSAMstrandField: "None"
+  outFilterMultimapNmax: 20
+  alignSJoverhangMin: 8
+  alignSJDBoverhangMin: 3 # encode uses 1 from https://academic.oup.com/bioinformatics/article/32/1/43/1744001#83425992. 1nt seems to exacerbate alignment errors
+  outFilterMismatchNmax: 10
+  alignIntronMin: 20
+  alignIntronMax: 1000000
+  alignMatesGapMax: 1000000
+  chimSegmentMin: 20
+  limitBAMsortRAM: 20000000000 # 20GB
+  scoreGenomicLengthLog2scale: 0 # default is -0.25
+  # set to 0, to not penalize longer introns compared with shorter introns, suggested from: https://academic.oup.com/bioinformatics/article/32/1/43/1744001#83425992 for junction 
+  # subselection
+junctions:
+  num_samples_with_sj: 1 # at least this many samples should have the splice junction
+  num_uniqmappers: 3 # min number unique mappers spanning SJ
+    
+stringtie:
+  # assembly
+  j: 3 # min num spliced reads that align across a junction
+  # merge
+  F: 0.1 # minimum input transcript FPKM to include in the merge
+  threads_merge: 10
+  # if stranded then add (from here https://chipster.csc.fi/manual/library-type-summary.html). This is very confusing!!! My data is from library where Read 1 generates sequences antisense 
+  # to the original RNA, while Read 2 yields sequences sense to the original RNA
+  strand: --rf 
+cpat:
+  # prebuild downloaded files from https://cfhcable.dl.sourceforge.net/project/rna-cpat/v1.2.3/CPAT-1.2.3.tar.gz also: coding prediction score threshold, 
+  # http://rna-cpat.sourceforge.net/#how-to-choose-cutoff Human coding probability (CP) cutoff: 0.364 (CP >=0.364 indicates coding sequence, CP < 0.364 indicates noncoding sequence) 
+  rdata: "data/Human_logitModel.RData"
+  tsv: "data/Human_Hexamer.tsv"
+  cp: 0.364 
+salmon:
+  # If the library is paired ended, choose from I = inward O = outward M = matching see https://salmon.readthedocs.io/en/latest/library_type.html If the library is standed/unstranded S = 
+  # stranded U = Unstranded If the library stranded you need to specify the strand from which the read originates e.g F = read 1 comes from the forward strand R = read 1 comes from the 
+  # reverse strand For my plasma samples the library is ISR
+  extra: "--libType ISR --gcBias"
+
+multiqc:
+  configfile: "scripts/multiqc-config.yaml"
+  
+## outputs
+outputs:
+  mapping: "01_mapping"
+  qc: "01b_qc"
+  stringtie: "02_stringtie"
+  gffcompare: "03_gffcompare"
+  novel: "04_novel"
+  counts: "05a_stringtie_counts"
+  counts2: "05b_salmon_counts"
+  salmon_trans_index: "06_salmon_transcripts_index"
+  circs: "07_circs"
+  multiqc: "08_multiqc"

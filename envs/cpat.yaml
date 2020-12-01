@@ -1,0 +1,8 @@
+name: cpat 
+channels:
+  - bioconda
+  - conda-forge
+  - defaults 
+dependencies:
+  - cpat=1.2.3=py27r3.4.1_0
+  - python=2.7.14=5
