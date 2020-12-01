@@ -1,5 +1,3 @@
-# PhD
-
 # A Pipeline developed by Zoe Ward 
 
 To analyse short read RNA-Seq for (novel)lncRNA and circRNA analysis
